@@ -25,7 +25,6 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      {/* pb-16 adds padding to the bottom so the mobile nav doesn't hide your content */}
       <body className="bg-slate-50 pb-16 sm:pb-0">
         <Header user={user} />
         <div className="min-h-[calc(100vh-4rem)]">
