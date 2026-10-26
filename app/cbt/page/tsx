@@ -1,0 +1,28 @@
+import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
+import { Card } from '@/components/ui/Card'
+
+export default async function CBTSelectionPage() {
+  const supabase = await createClient()
+  const { data: subjects } = await supabase.from('subjects').select('*').order('name')
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <div className="mb-8">
+        <h1 className="font-display text-3xl font-bold text-litl-ink">CBT Practice</h1>
+        <p className="text-litl-muted mt-2">Select a subject to start a practice test.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {subjects?.map((sub) => (
+          <Link key={sub.id} href={`/cbt/${sub.id}`}>
+            <Card className="h-full hover:border-litl-blue transition-colors cursor-pointer">
+              <h2 className="font-display text-xl font-bold text-litl-blue mb-2">{sub.name}</h2>
+              <p className="text-sm text-slate-600">Test your knowledge in {sub.name}.</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
