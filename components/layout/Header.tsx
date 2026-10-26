@@ -38,7 +38,6 @@ export function Header({ user }: { user: any }) {
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {menuOpen && (
         <div className="fixed inset-0 z-50 bg-white sm:hidden pt-20 px-6">
           <button onClick={() => setMenuOpen(false)} className="absolute top-4 right-4 text-2xl">✕</button>
