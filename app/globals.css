@@ -31,7 +31,6 @@ a {
   box-sizing: border-box;
 }
 
-/* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
