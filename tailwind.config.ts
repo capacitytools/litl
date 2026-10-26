@@ -8,24 +8,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Primary brand palette
         litl: {
           blue: {
-            DEFAULT: "#0B3D91", // primary blue
+            DEFAULT: "#0B3D91",
             light: "#1E5BC6",
             dark: "#072B67",
           },
           gold: {
-            DEFAULT: "#D4A017", // supporting gold
+            DEFAULT: "#D4A017",
             light: "#E6B948",
             dark: "#A67C0F",
           },
           wine: {
-            DEFAULT: "#7B1E3A", // supporting wine
+            DEFAULT: "#7B1E3A",
             light: "#9C2A4F",
             dark: "#5A152A",
           },
-          // Neutrals
           white: "#FFFFFF",
           cream: "#F7F4EC",
           ink: "#0F172A",
