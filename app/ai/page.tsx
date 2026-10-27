@@ -45,7 +45,6 @@ export default function AITutorPage() {
       </div>
 
       <Card className="flex-1 flex flex-col overflow-hidden p-0">
-        {/* Chat History */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -61,7 +60,6 @@ export default function AITutorPage() {
           {loading && <div className="text-sm text-slate-400 italic">AI is thinking...</div>}
         </div>
 
-        {/* Chat Input */}
         <form onSubmit={handleSend} className="border-t border-slate-200 p-3 bg-white flex gap-2">
           <input
             type="text"
