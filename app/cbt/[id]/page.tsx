@@ -17,15 +17,15 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: string }>({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [score, setScore] = useState<number | null>(null)
+  const [result, setResult] = useState<any>(null)
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('questions')
         .select('*')
         .eq('subject_id', subjectId)
-        .limit(5) // For now, let's do a 5-question test
+        .limit(5)
 
       if (data) setQuestions(data)
       setLoading(false)
@@ -43,24 +43,19 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     }
 
     setSubmitting(true)
-    let correctCount = 0
-
-    questions.forEach(q => {
-      if (selectedAnswers[q.id] === q.correct_option) correctCount++
+    
+    // Send answers to the secure API route
+    const res = await fetch('/api/submit-exam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subjectId, answers: selectedAnswers })
     })
 
-    const finalScore = Math.round((correctCount / questions.length) * 100)
-    setScore(finalScore)
-
-    // Save to database
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('exam_attempts').insert([{
-        user_id: user.id,
-        subject_id: subjectId,
-        score: finalScore,
-        total_questions: questions.length
-      }])
+    const data = await res.json()
+    if (res.ok) {
+      setResult(data)
+    } else {
+      alert('Error submitting exam: ' + data.error)
     }
     setSubmitting(false)
   }
@@ -69,14 +64,14 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   if (questions.length === 0) return <div className="p-8 text-center">No questions available for this subject yet.</div>
 
   // RESULTS SCREEN
-  if (score !== null) {
+  if (result) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 text-center">
         <Card>
           <h1 className="text-3xl font-bold text-litl-ink mb-2">Exam Complete!</h1>
           <p className="text-slate-500 mb-6">Here is how you performed.</p>
-          <div className="text-6xl font-bold text-litl-blue mb-6">{score}%</div>
-          <p className="text-lg text-litl-ink mb-8">You got {Object.keys(selectedAnswers).filter(id => selectedAnswers[id] === questions.find(q => q.id === id)?.correct_option).length} out of {questions.length} correct.</p>
+          <div className="text-6xl font-bold text-litl-blue mb-6">{result.score}%</div>
+          <p className="text-lg text-litl-ink mb-8">You got {result.correct} out of {result.total} correct.</p>
           <div className="flex justify-center gap-4">
             <Button onClick={() => window.location.reload()}>Try Again</Button>
             <Button variant="outline" onClick={() => router.push('/cbt')}>Back to CBT</Button>
