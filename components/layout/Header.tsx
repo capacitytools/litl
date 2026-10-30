@@ -44,6 +44,7 @@ export function Header({ user }: { user: any }) {
           <nav className="flex flex-col space-y-6 text-lg font-medium text-litl-ink">
             <Link href="/study" onClick={() => setMenuOpen(false)}>Study Centre</Link>
             <Link href="/cbt" onClick={() => setMenuOpen(false)}>CBT Centre</Link>
+            <Link href="/marketplace" onClick={() => setMenuOpen(false)}>Marketplace</Link>
             <Link href="/ai" onClick={() => setMenuOpen(false)}>AI Learning</Link>
             <hr className="border-slate-100" />
             <Link href="/about" onClick={() => setMenuOpen(false)}>About LITL</Link>
