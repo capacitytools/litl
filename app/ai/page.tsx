@@ -12,7 +12,6 @@ export default function AIScannerPage() {
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Convert image file to Base64 for the API
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -28,7 +27,6 @@ export default function AIScannerPage() {
     const reader = new FileReader()
     reader.onloadend = () => {
       setPreview(reader.result as string)
-      // Remove the data:image/jpeg;base64, prefix
       const base64String = (reader.result as string).split(',')[1]
       setImage(base64String)
     }
