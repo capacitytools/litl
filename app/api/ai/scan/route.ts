@@ -1,122 +1,69 @@
-'use client'
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-import { useState, useRef } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
-
-export default function AIScannerPage() {
-  const [image, setImage] = useState<string | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Convert image file to Base64 for the API
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image is too large. Please select an image under 5MB.')
-      return
+export async function POST(req: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Please sign in to use the AI Scanner.' }, { status: 401 })
     }
 
-    setError(null)
-    setResult(null)
-    
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPreview(reader.result as string)
-      // Remove the data:image/jpeg;base64, prefix
-      const base64String = (reader.result as string).split(',')[1]
-      setImage(base64String)
+    const { imageBase64 } = await req.json()
+    if (!imageBase64) {
+      return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
-    reader.readAsDataURL(file)
-  }
 
-  const handleScan = async () => {
-    if (!image) return
-    setLoading(true)
-    setError(null)
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'AI is not configured yet. Missing API Key.' }, { status: 500 })
+    }
 
-    try {
-      const res = await fetch('/api/ai/scan', {
+    const promptText = `You are the LITL AI Tutor, a helpful, encouraging educational assistant for Nigerian students. 
+Look at the image provided. It contains a math, science, or educational problem. 
+Solve the problem step-by-step. Keep the explanation clear and easy to understand for a secondary school student.`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: image })
-      })
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptText },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageBase64
+                }
+              }
+            ]
+          }]
+        })
+      }
+    )
 
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Failed to scan image')
-
-      setResult(data.solution)
-    } catch (err: any) {
-      setError(err.message)
+    const data = await response.json()
+    
+    if (!response.ok) {
+      console.error('Gemini API Error:', data)
+      return NextResponse.json({ 
+        error: data.error?.message || 'The AI is currently busy. Please try again later.' 
+      }, { status: response.status })
     }
-    setLoading(false)
+
+    let aiText = ''
+    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      aiText = data.candidates[0].content.parts[0].text
+    } else {
+      return NextResponse.json({ error: 'AI could not read the image. Please try a clearer photo.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ solution: aiText })
+
+  } catch (err: any) {
+    console.error('Server Error:', err)
+    return NextResponse.json({ error: 'Internal Server Error: ' + err.message }, { status: 500 })
   }
-
-  const resetScanner = () => {
-    setImage(null)
-    setPreview(null)
-    setResult(null)
-    setError(null)
-  }
-
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-      <div className="text-center mb-8">
-        <h1 className="font-display text-3xl font-bold text-litl-ink mb-2">AI Snap & Solve</h1>
-        <p className="text-litl-muted">Take a picture of any math or science problem, and let the AI explain it step-by-step.</p>
-      </div>
-
-      <Card className="flex flex-col items-center">
-        {!preview ? (
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full h-64 border-2 border-dashed border-litl-blue/50 rounded-litl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
-          >
-            <span className="text-5xl mb-4">📸</span>
-            <p className="font-semibold text-litl-blue">Tap to Snap or Upload Image</p>
-            <p className="text-xs text-slate-500 mt-1">JPG, PNG up to 5MB</p>
-          </div>
-        ) : (
-          <div className="w-full">
-            <img src={preview} alt="Preview" className="w-full max-h-64 object-contain rounded-litl mb-4 bg-slate-100" />
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={resetScanner} disabled={loading} fullWidth>Retake</Button>
-              <Button onClick={handleScan} disabled={loading} fullWidth>
-                {loading ? 'Scanning...' : 'Solve Problem'}
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        <input 
-          type="file" 
-          accept="image/*" 
-          className="hidden" 
-          ref={fileInputRef} 
-          onChange={handleImageChange} 
-        />
-      </Card>
-
-      {error && (
-        <div className="mt-6 rounded bg-red-50 p-4 text-sm text-red-600 border border-red-100">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <Card className="mt-6 bg-slate-50">
-          <h2 className="font-bold text-litl-ink mb-3">Solution:</h2>
-          <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
-            {result}
-          </div>
-        </Card>
-      )}
-    </div>
-  )
 }
