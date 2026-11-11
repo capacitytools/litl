@@ -1,77 +1,122 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 
-export default function AITutorPage() {
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([
-    { role: 'ai', text: 'Hello! I am your LITL AI Tutor. What would you like to learn about today?' }
-  ])
-  const [input, setInput] = useState('')
+export default function AIScannerPage() {
+  const [image, setImage] = useState<string | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim()) return
+  // Convert image file to Base64 for the API
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
 
-    const userMsg = input
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }])
-    setInput('')
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image is too large. Please select an image under 5MB.')
+      return
+    }
+
+    setError(null)
+    setResult(null)
+    
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPreview(reader.result as string)
+      // Remove the data:image/jpeg;base64, prefix
+      const base64String = (reader.result as string).split(',')[1]
+      setImage(base64String)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleScan = async () => {
+    if (!image) return
     setLoading(true)
+    setError(null)
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/ai/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ imageBase64: image })
       })
+
       const data = await res.json()
 
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) throw new Error(data.error || 'Failed to scan image')
 
-      setMessages(prev => [...prev, { role: 'ai', text: data.reply }])
-    } catch (error: any) {
-      setMessages(prev => [...prev, { role: 'ai', text: 'Error: ' + error.message }])
+      setResult(data.solution)
+    } catch (err: any) {
+      setError(err.message)
     }
     setLoading(false)
   }
 
+  const resetScanner = () => {
+    setImage(null)
+    setPreview(null)
+    setResult(null)
+    setError(null)
+  }
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 h-[calc(100vh-8rem)] flex flex-col">
-      <div className="mb-4">
-        <h1 className="font-display text-2xl font-bold text-litl-ink">AI Tutor</h1>
-        <p className="text-sm text-litl-muted">Ask me to explain any topic!</p>
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="text-center mb-8">
+        <h1 className="font-display text-3xl font-bold text-litl-ink mb-2">AI Snap & Solve</h1>
+        <p className="text-litl-muted">Take a picture of any math or science problem, and let the AI explain it step-by-step.</p>
       </div>
 
-      <Card className="flex-1 flex flex-col overflow-hidden p-0">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-litl px-4 py-2 text-sm ${
-                msg.role === 'user' 
-                  ? 'bg-litl-blue text-white' 
-                  : 'bg-slate-100 text-litl-ink whitespace-pre-wrap'
-              }`}>
-                {msg.text}
-              </div>
+      <Card className="flex flex-col items-center">
+        {!preview ? (
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full h-64 border-2 border-dashed border-litl-blue/50 rounded-litl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors"
+          >
+            <span className="text-5xl mb-4">📸</span>
+            <p className="font-semibold text-litl-blue">Tap to Snap or Upload Image</p>
+            <p className="text-xs text-slate-500 mt-1">JPG, PNG up to 5MB</p>
+          </div>
+        ) : (
+          <div className="w-full">
+            <img src={preview} alt="Preview" className="w-full max-h-64 object-contain rounded-litl mb-4 bg-slate-100" />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={resetScanner} disabled={loading} fullWidth>Retake</Button>
+              <Button onClick={handleScan} disabled={loading} fullWidth>
+                {loading ? 'Scanning...' : 'Solve Problem'}
+              </Button>
             </div>
-          ))}
-          {loading && <div className="text-sm text-slate-400 italic">AI is thinking...</div>}
-        </div>
-
-        <form onSubmit={handleSend} className="border-t border-slate-200 p-3 bg-white flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Ask a question..."
-            className="flex-1 rounded-litl border border-slate-300 px-3 py-2 text-sm focus:border-litl-blue focus:outline-none"
-            disabled={loading}
-          />
-          <Button type="submit" disabled={loading || !input.trim()}>Send</Button>
-        </form>
+          </div>
+        )}
+        
+        <input 
+          type="file" 
+          accept="image/*" 
+          className="hidden" 
+          ref={fileInputRef} 
+          onChange={handleImageChange} 
+        />
       </Card>
+
+      {error && (
+        <div className="mt-6 rounded bg-red-50 p-4 text-sm text-red-600 border border-red-100">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <Card className="mt-6 bg-slate-50">
+          <h2 className="font-bold text-litl-ink mb-3">Solution:</h2>
+          <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
+            {result}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
