@@ -46,7 +46,6 @@ export default function AIScannerPage() {
       })
 
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.error || 'Failed to scan image')
 
       setResult(data.solution)
@@ -63,14 +62,47 @@ export default function AIScannerPage() {
     setError(null)
   }
 
+  // Helper to parse the AI's specific format into blocks
+  const renderResult = (text: string) => {
+    const sections = text.split(/\*\*(.*?)\*\*/g).filter(Boolean);
+    const blocks = [];
+    for (let i = 0; i < sections.length; i += 2) {
+      const title = sections[i].trim();
+      const content = sections[i + 1]?.trim() || '';
+      if (title && content) blocks.push({ title, content });
+    }
+
+    if (blocks.length === 0) return <p className="whitespace-pre-wrap">{text}</p>;
+
+    return blocks.map((block, idx) => {
+      let color = 'bg-slate-50 border-slate-200 text-slate-700';
+      let titleColor = 'text-litl-ink';
+      
+      if (block.title.includes('DIAGNOSIS')) {
+        color = 'bg-red-50 border-red-200'; titleColor = 'text-red-700';
+      } else if (block.title.includes('SEVERITY') || block.title.includes('OBSERVATION')) {
+        color = 'bg-yellow-50 border-yellow-200'; titleColor = 'text-yellow-700';
+      } else if (block.title.includes('SOLUTION') || block.title.includes('TREATMENT')) {
+        color = 'bg-green-50 border-green-200'; titleColor = 'text-green-700';
+      }
+
+      return (
+        <div key={idx} className={`p-4 rounded-litl border mb-3 ${color}`}>
+          <h3 className={`font-bold mb-1 ${titleColor}`}>{block.title}</h3>
+          <p className="whitespace-pre-wrap text-sm">{block.content}</p>
+        </div>
+      )
+    })
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       <div className="text-center mb-8">
         <h1 className="font-display text-3xl font-bold text-litl-ink mb-2">AI Snap & Solve</h1>
-        <p className="text-litl-muted">Take a picture of any math or science problem, and let the AI explain it step-by-step.</p>
+        <p className="text-litl-muted">Take a picture of any problem, and let the AI explain it step-by-step.</p>
       </div>
 
-      <Card className="flex flex-col items-center">
+      <Card className="flex flex-col items-center p-4">
         {!preview ? (
           <div 
             onClick={() => fileInputRef.current?.click()}
@@ -81,11 +113,24 @@ export default function AIScannerPage() {
             <p className="text-xs text-slate-500 mt-1">JPG, PNG up to 5MB</p>
           </div>
         ) : (
-          <div className="w-full">
-            <img src={preview} alt="Preview" className="w-full max-h-64 object-contain rounded-litl mb-4 bg-slate-100" />
+          <div className="w-full relative">
+            <div className="relative overflow-hidden rounded-litl mb-4 bg-slate-100 flex justify-center">
+              <img src={preview} alt="Preview" className="w-full max-h-64 object-contain" />
+              
+              {/* Scanning Animation */}
+              {loading && (
+                <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                  <div className="w-full h-1 bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse absolute top-0 left-0" style={{ animation: 'scan 2s linear infinite' }} />
+                  <div className="bg-black/60 text-white px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase">
+                    Analyzing...
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <div className="flex gap-2">
-              <Button variant="outline" onClick={resetScanner} disabled={loading} fullWidth>Retake</Button>
-              <Button onClick={handleScan} disabled={loading} fullWidth>
+              <Button variant="outline" onClick={resetScanner} disabled={loading} className="flex-1">Retake</Button>
+              <Button onClick={handleScan} disabled={loading} className="flex-1">
                 {loading ? 'Scanning...' : 'Solve Problem'}
               </Button>
             </div>
@@ -95,6 +140,7 @@ export default function AIScannerPage() {
         <input 
           type="file" 
           accept="image/*" 
+          capture="environment"
           className="hidden" 
           ref={fileInputRef} 
           onChange={handleImageChange} 
@@ -108,13 +154,21 @@ export default function AIScannerPage() {
       )}
 
       {result && (
-        <Card className="mt-6 bg-slate-50">
-          <h2 className="font-bold text-litl-ink mb-3">Solution:</h2>
-          <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
-            {result}
-          </div>
-        </Card>
+        <div className="mt-6">
+          <h2 className="font-display text-xl font-bold text-litl-ink mb-4">AI Analysis</h2>
+          {renderResult(result)}
+        </div>
       )}
+
+      {/* Custom animation style */}
+      <style jsx>{`
+        @keyframes scan {
+          0% { transform: translateY(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(256px); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }
