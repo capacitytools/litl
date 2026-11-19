@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Force the route to use the edge runtime or allow longer execution if on Vercel Pro
+export const maxDuration = 60; 
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
@@ -19,7 +22,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'AI is not configured yet. Missing API Key.' }, { status: 500 })
     }
 
-    // 🎯 The exact System Prompt from your blueprint
     const promptText = `You are a Senior LITL Educational Tutor with 20 years of experience in the Nigerian curriculum (WAEC, NECO, JAMB). 
 I am sending you an image of a math, science, or educational problem. 
 Analyze the visual evidence and provide the solution using EXACTLY this format:
@@ -44,18 +46,24 @@ SAFETY RULES:
 - Always explain the steps clearly.
 - If the image is unclear, politely ask the user to take a better picture.`
 
-    // 🎯 The Model Fallback Ladder from your blueprint
-    const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest']
+    // 🎯 UPDATED: Using the valid 3.8-flash model. 
+    // Added fallback to flash-lite just in case.
+    const models = ['gemini-3.8-flash', 'gemini-2.5-flash-lite']
     let aiText = ''
     let lastError = ''
 
     for (const model of models) {
       try {
+        // Added a 45-second timeout to prevent Vercel from hard-killing the request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
+
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
             body: JSON.stringify({
               contents: [{
                 parts: [
@@ -66,6 +74,8 @@ SAFETY RULES:
             })
           }
         )
+        
+        clearTimeout(timeoutId);
 
         const data = await response.json()
         
@@ -74,15 +84,20 @@ SAFETY RULES:
           break // Success! Break out of the loop
         } else {
           lastError = data.error?.message || `Model ${model} failed`
-          console.log(`Model ${model} failed. Trying next...`)
+          console.log(`Model ${model} failed. Trying next... Reason: ${lastError}`)
         }
       } catch (err: any) {
-        lastError = err.message
+        // Catch abort/timeout errors
+        if (err.name === 'AbortError') {
+          lastError = `Model ${model} timed out.`
+        } else {
+          lastError = err.message
+        }
       }
     }
 
     if (!aiText) {
-      return NextResponse.json({ error: 'All AI models are currently busy. Please try again later.' }, { status: 503 })
+      return NextResponse.json({ error: `AI failed to respond: ${lastError}` }, { status: 503 })
     }
 
     return NextResponse.json({ solution: aiText })
