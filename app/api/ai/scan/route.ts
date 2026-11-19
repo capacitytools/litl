@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Force the route to use the edge runtime or allow longer execution if on Vercel Pro
 export const maxDuration = 60; 
 
 export async function POST(req: Request) {
@@ -46,15 +45,13 @@ SAFETY RULES:
 - Always explain the steps clearly.
 - If the image is unclear, politely ask the user to take a better picture.`
 
-    // 🎯 UPDATED: Using the valid 3.8-flash model. 
-    // Added fallback to flash-lite just in case.
-    const models = ['gemini-3.8-flash', 'gemini-2.5-flash-lite']
+    // 🎯 FIXED: Using only models available to new projects
+    const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
     let aiText = ''
     let lastError = ''
 
     for (const model of models) {
       try {
-        // Added a 45-second timeout to prevent Vercel from hard-killing the request
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -81,13 +78,12 @@ SAFETY RULES:
         
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           aiText = data.candidates[0].content.parts[0].text
-          break // Success! Break out of the loop
+          break 
         } else {
           lastError = data.error?.message || `Model ${model} failed`
-          console.log(`Model ${model} failed. Trying next... Reason: ${lastError}`)
+          console.log(`Model ${model} failed. Reason: ${lastError}`)
         }
       } catch (err: any) {
-        // Catch abort/timeout errors
         if (err.name === 'AbortError') {
           lastError = `Model ${model} timed out.`
         } else {
